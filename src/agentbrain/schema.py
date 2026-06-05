@@ -1,4 +1,4 @@
-"""Database schema for agent-db.
+"""Database schema for agentbrain.
 
 Seven tables, and they exist for one reason: **using the API correctly fills
 all of them as a side effect.** That is the whole pitch. A bash hook could
@@ -20,7 +20,7 @@ write path can.
 - ``errors``       captured failures, for after-the-fact diagnosis.
 
 The loop ``learnings → hypotheses → experiments → learnings(preference)`` is the
-thing that separates agent-db from a plain memory store: it does not just
+thing that separates agentbrain from a plain memory store: it does not just
 remember what you told it, it discovers what actually works and promotes it.
 
 Types are validated against a *default* vocabulary but are **open** — live data
@@ -241,7 +241,7 @@ def apply_schema(conn: sqlite3.Connection, now: str) -> None:
             raise IncompatibleDatabaseError(
                 f"table {table!r} exists but is missing columns {sorted(missing)}; "
                 "this database was created by another tool with an incompatible "
-                "schema and cannot be opened by agent-db."
+                "schema and cannot be opened by agentbrain."
             )
     # Indexes last, now that every migrated column exists.
     conn.executescript(_INDEXES)

@@ -1,8 +1,8 @@
-"""Behavioural tests for agent-db. Each test proves a contract of the API, not
+"""Behavioural tests for agentbrain. Each test proves a contract of the API, not
 its implementation, so the schema can evolve underneath them.
 
 The headline tests are the loop (``test_full_loop_*``) and the three target use
-cases (content / lead capture / job applications) — those are what agent-db
+cases (content / lead capture / job applications) — those are what agentbrain
 exists to do, so they are tested as first-class behaviour.
 """
 
@@ -13,12 +13,12 @@ import threading
 
 import pytest
 
-from agentdb import AgentDB, ContextEntry, IncompatibleDatabaseError, Learning
+from agentbrain import AgentBrain, ContextEntry, IncompatibleDatabaseError, Learning
 
 
 @pytest.fixture()
 def db(tmp_path):
-    database = AgentDB(tmp_path / "agent.db", agent="tester")
+    database = AgentBrain(tmp_path / "agent.db", agent="tester")
     yield database
     database.close()
 
@@ -81,7 +81,7 @@ def test_forget(db):
 # -- the self-improving loop (the moat) ------------------------------------
 
 def test_pattern_graduates_to_hypothesis_at_promote_at(tmp_path):
-    db = AgentDB(tmp_path / "a.db", promote_at=3)
+    db = AgentBrain(tmp_path / "a.db", promote_at=3)
     db.learn("pattern", "X works", domain="d")  # hit 1
     assert db.hypotheses() == []
     db.learn("pattern", "X works")              # hit 2
@@ -97,7 +97,7 @@ def test_pattern_graduates_to_hypothesis_at_promote_at(tmp_path):
 
 
 def test_recall_can_trigger_graduation(tmp_path):
-    db = AgentDB(tmp_path / "a.db", promote_at=3)
+    db = AgentBrain(tmp_path / "a.db", promote_at=3)
     db.learn("pattern", "recall me")            # hit 1
     db.recall("recall")                         # hit 2
     db.recall("recall")                         # hit 3 -> graduates
@@ -106,7 +106,7 @@ def test_recall_can_trigger_graduation(tmp_path):
 
 
 def test_only_patterns_graduate(tmp_path):
-    db = AgentDB(tmp_path / "a.db", promote_at=2)
+    db = AgentBrain(tmp_path / "a.db", promote_at=2)
     for _ in range(3):
         db.learn("gotcha", "not a pattern")
     assert db.hypotheses() == []
@@ -116,7 +116,7 @@ def test_only_patterns_graduate(tmp_path):
 def test_full_loop_pattern_to_proven_preference(tmp_path):
     """The headline behaviour: a recurring pattern, tested by verdicts, becomes
     a proven `preference` with zero manual bookkeeping."""
-    db = AgentDB(tmp_path / "loop.db", promote_at=2, graduate_at=0.8, min_experiments=3)
+    db = AgentBrain(tmp_path / "loop.db", promote_at=2, graduate_at=0.8, min_experiments=3)
 
     # 1. a pattern recurs and graduates to a hypothesis
     db.learn("pattern", "ship small PRs", domain="eng")
@@ -148,7 +148,7 @@ def test_full_loop_pattern_to_proven_preference(tmp_path):
 
 
 def test_hypothesis_rejected_when_evidence_refutes(tmp_path):
-    db = AgentDB(tmp_path / "r.db", promote_at=2, graduate_at=0.8, min_experiments=3)
+    db = AgentBrain(tmp_path / "r.db", promote_at=2, graduate_at=0.8, min_experiments=3)
     db.learn("pattern", "premature idea")
     db.learn("pattern", "premature idea")
     h = db.hypotheses(status="testing")[0]
@@ -161,7 +161,7 @@ def test_hypothesis_rejected_when_evidence_refutes(tmp_path):
 
 
 def test_verdict_on_explicit_hypothesis(tmp_path):
-    db = AgentDB(tmp_path / "e.db", promote_at=1, min_experiments=2, graduate_at=0.8)
+    db = AgentBrain(tmp_path / "e.db", promote_at=1, min_experiments=2, graduate_at=0.8)
     db.learn("pattern", "direct")               # graduates immediately (promote_at=1)
     h = db.hypotheses(status="testing")[0]
     db.verdict("pass", hypothesis=h.id, evidence="a")
@@ -222,7 +222,7 @@ def test_verdict_rejects_bad_result(db):
 # -- sessions & deterministic population ------------------------------------
 
 def test_session_writes_and_closes_row(tmp_path):
-    db = AgentDB(tmp_path / "s.db")
+    db = AgentBrain(tmp_path / "s.db")
     with db.session(task="feature", tier=2) as s:
         s.learn("pattern", "inside a session")
         sid = s.id
@@ -234,7 +234,7 @@ def test_session_writes_and_closes_row(tmp_path):
 
 
 def test_session_records_exception_as_error_and_failure(tmp_path):
-    db = AgentDB(tmp_path / "x.db")
+    db = AgentBrain(tmp_path / "x.db")
     with pytest.raises(RuntimeError):
         with db.session(task="risky") as s:
             sid = s.id
@@ -247,7 +247,7 @@ def test_session_records_exception_as_error_and_failure(tmp_path):
 
 
 def test_every_write_emits_an_event(tmp_path):
-    db = AgentDB(tmp_path / "ev.db")
+    db = AgentBrain(tmp_path / "ev.db")
     with db.session(task="t") as s:
         s.learn("pattern", "a")
         s.checkpoint({"did": "b"})
@@ -257,7 +257,7 @@ def test_every_write_emits_an_event(tmp_path):
 
 
 def test_flat_api_uses_ambient_session(tmp_path):
-    db = AgentDB(tmp_path / "amb.db")
+    db = AgentBrain(tmp_path / "amb.db")
     db.learn("pattern", "no explicit session")
     sessions = db._query("SELECT * FROM sessions WHERE task = 'ambient'")
     assert len(sessions) == 1
@@ -284,7 +284,7 @@ def test_stats_covers_all_core_tables(db):
 # -- read_start digest -----------------------------------------------------
 
 def test_read_start_surfaces_preferences_first(tmp_path):
-    db = AgentDB(tmp_path / "b.db", promote_at=1, min_experiments=2, graduate_at=0.8)
+    db = AgentBrain(tmp_path / "b.db", promote_at=1, min_experiments=2, graduate_at=0.8)
     db.learn("pattern", "proven rule")          # graduates to hypothesis immediately
     h = db.hypotheses(status="testing")[0]
     db.verdict("pass", hypothesis=h.id)
@@ -338,14 +338,14 @@ def test_prune_keeps_recent_checkpoints_only(db):
 
 def test_persists_across_reopen(tmp_path):
     path = tmp_path / "p.db"
-    with AgentDB(path) as db:
+    with AgentBrain(path) as db:
         db.learn("pattern", "durable")
-    with AgentDB(path) as db2:
+    with AgentBrain(path) as db2:
         assert len(db2.learnings()) == 1
 
 
 def test_thread_safe_writes(tmp_path):
-    db = AgentDB(tmp_path / "c.db")
+    db = AgentBrain(tmp_path / "c.db")
 
     def worker(n: int) -> None:
         for i in range(20):
@@ -361,7 +361,7 @@ def test_thread_safe_writes(tmp_path):
 
 
 def test_in_memory_database():
-    db = AgentDB(":memory:")
+    db = AgentBrain(":memory:")
     db.learn("pattern", "ephemeral")
     assert len(db.learnings()) == 1
     db.close()
@@ -398,7 +398,7 @@ def test_opens_and_migrates_legacy_database(tmp_path):
     conn.commit()
     conn.close()
 
-    db = AgentDB(path)
+    db = AgentBrain(path)
     # legacy rows survived, including the out-of-vocabulary type
     assert any(l.insight == "legacy insight" for l in db.learnings())
     assert db.context(type="checkpoint")[0].content == "old note"
@@ -413,7 +413,7 @@ def test_opens_and_migrates_legacy_database(tmp_path):
 def test_use_case_content_engine(tmp_path):
     """A pattern about what drives engagement gets proven by post outcomes and
     graduates into the brand's playbook — replacing maerai's patterns.json."""
-    db = AgentDB(tmp_path / "content.db", promote_at=2, min_experiments=3, graduate_at=0.66)
+    db = AgentBrain(tmp_path / "content.db", promote_at=2, min_experiments=3, graduate_at=0.66)
     with db.session(task="content", agent="maerai") as s:
         s.learn("pattern", "question hooks lift saves", domain="instagram")
         s.learn("pattern", "question hooks lift saves", domain="instagram")  # -> hypothesis
@@ -431,7 +431,7 @@ def test_use_case_content_engine(tmp_path):
 
 def test_use_case_lead_capture(tmp_path):
     """Per-lead memory plus a learned rule about what converts."""
-    db = AgentDB(tmp_path / "leads.db", promote_at=2, min_experiments=2, graduate_at=0.8)
+    db = AgentBrain(tmp_path / "leads.db", promote_at=2, min_experiments=2, graduate_at=0.8)
     with db.session(task="lead-capture") as s:
         lead = s.unit({"name": "Acme", "source": "webinar"}, kind="contract")
         s.checkpoint({"stage": "contacted"}, unit=lead)
@@ -453,7 +453,7 @@ def test_use_case_lead_capture(tmp_path):
 def test_use_case_job_applications(tmp_path):
     """Each application is a unit; a learned tactic about what gets responses
     graduates once enough applications confirm it."""
-    db = AgentDB(tmp_path / "jobs.db", promote_at=2, min_experiments=3, graduate_at=0.6)
+    db = AgentBrain(tmp_path / "jobs.db", promote_at=2, min_experiments=3, graduate_at=0.6)
     with db.session(task="job-app") as s:
         s.learn("pattern", "lead with a shipped metric", domain="resume")
         s.learn("pattern", "lead with a shipped metric", domain="resume")
@@ -470,7 +470,7 @@ def test_use_case_job_applications(tmp_path):
 def test_concurrent_verdicts_graduate_exactly_once(tmp_path):
     """C1: racing verdicts on one hypothesis must not double-graduate."""
     for _ in range(8):
-        db = AgentDB(tmp_path / f"g{_}.db", promote_at=1, min_experiments=3, graduate_at=0.8)
+        db = AgentBrain(tmp_path / f"g{_}.db", promote_at=1, min_experiments=3, graduate_at=0.8)
         db.learn("pattern", "grace")
         h = db.hypotheses(status="testing")[0]
         barrier = threading.Barrier(4)
@@ -491,7 +491,7 @@ def test_concurrent_verdicts_graduate_exactly_once(tmp_path):
 
 def test_two_hypotheses_same_statement_dedupe_preference(tmp_path):
     """H1: two hypotheses with identical statements graduate to one preference."""
-    db = AgentDB(tmp_path / "d.db", promote_at=1, min_experiments=2, graduate_at=0.8)
+    db = AgentBrain(tmp_path / "d.db", promote_at=1, min_experiments=2, graduate_at=0.8)
     db.learn("pattern", "same statement")
     h1 = db.hypotheses(status="testing")[0]
     db.verdict("pass", hypothesis=h1.id)
@@ -521,12 +521,12 @@ def test_two_hypotheses_same_statement_dedupe_preference(tmp_path):
 def test_rejects_out_of_range_loop_params(tmp_path, kwargs):
     """H2: nonsense tuning parameters are refused at construction."""
     with pytest.raises(ValueError):
-        AgentDB(tmp_path / "p.db", **kwargs)
+        AgentBrain(tmp_path / "p.db", **kwargs)
 
 
 def test_exact_reject_boundary_rejects(tmp_path):
     """H3: 1 pass / 4 fail at graduate_at=0.8 is an 80% failure → rejected, not stuck."""
-    db = AgentDB(tmp_path / "h3.db", promote_at=1, min_experiments=5, graduate_at=0.8)
+    db = AgentBrain(tmp_path / "h3.db", promote_at=1, min_experiments=5, graduate_at=0.8)
     db.learn("pattern", "boundary")
     h = db.hypotheses(status="testing")[0]
     db.verdict("pass", hypothesis=h.id)
@@ -538,7 +538,7 @@ def test_exact_reject_boundary_rejects(tmp_path):
 
 def test_exact_graduate_boundary_graduates(tmp_path):
     """H3 mirror: 4 pass / 1 fail = 0.8 exactly should graduate."""
-    db = AgentDB(tmp_path / "h3b.db", promote_at=1, min_experiments=5, graduate_at=0.8)
+    db = AgentBrain(tmp_path / "h3b.db", promote_at=1, min_experiments=5, graduate_at=0.8)
     db.learn("pattern", "boundary2")
     h = db.hypotheses(status="testing")[0]
     for _ in range(4):
@@ -557,7 +557,7 @@ def test_foreign_shaped_table_is_rejected(tmp_path):
     conn.commit()
     conn.close()
     with pytest.raises(IncompatibleDatabaseError):
-        AgentDB(path)
+        AgentBrain(path)
 
 
 def test_legacy_context_without_contract_id_migrates(tmp_path):
@@ -570,7 +570,7 @@ def test_legacy_context_without_contract_id_migrates(tmp_path):
     )
     conn.commit()
     conn.close()
-    db = AgentDB(path)
+    db = AgentBrain(path)
     uid = db.unit("works now", kind="contract")
     assert db.get_context(uid) is not None
     db.close()
@@ -578,7 +578,7 @@ def test_legacy_context_without_contract_id_migrates(tmp_path):
 
 def test_verdict_conflicting_unit_and_hypothesis_raises(tmp_path):
     """M3: a unit linked to hypothesis A plus an explicit hypothesis B is ambiguous."""
-    db = AgentDB(tmp_path / "m3.db", promote_at=1)
+    db = AgentBrain(tmp_path / "m3.db", promote_at=1)
     db.learn("pattern", "A")
     db.learn("pattern", "B")
     ha, hb = db.hypotheses()[0].id, db.hypotheses()[1].id

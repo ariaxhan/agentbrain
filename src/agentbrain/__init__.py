@@ -1,6 +1,6 @@
-"""agent-db — a SQLite-backed memory layer with a self-improving loop.
+"""agentbrain — a SQLite-backed memory layer with a self-improving loop.
 
-Not just a place to store what you tell it. agent-db *discovers what works*:
+Not just a place to store what you tell it. agentbrain *discovers what works*:
 a pattern you record enough times graduates into a hypothesis, every verdict on
 it is an experiment, and once the evidence clears the bar it graduates again
 into a proven ``preference``. That loop — learn → prove → graduate — is what
@@ -10,9 +10,9 @@ zero dependencies and no server.
 Using the API correctly fills every table as a side effect: open a session and
 each write inherits its id, emits an event, and turns the loop.
 
-    from agentdb import AgentDB
+    from agentbrain import AgentBrain
 
-    db = AgentDB("agent.db")
+    db = AgentBrain("agent.db")
     with db.session(task="content") as s:
         s.learn("pattern", "question hooks lift saves", domain="ig")  # ×3 → hypothesis
         h = db.hypotheses(status="testing")[0]
@@ -25,7 +25,7 @@ from .db import (
     DEFAULT_GRADUATE_AT,
     DEFAULT_MIN_EXPERIMENTS,
     DEFAULT_PROMOTE_AT,
-    AgentDB,
+    AgentBrain,
     Session,
 )
 from .models import (
@@ -41,7 +41,7 @@ from .schema import IncompatibleDatabaseError
 __version__ = "1.0.0"
 
 __all__ = [
-    "AgentDB",
+    "AgentBrain",
     "Session",
     "Learning",
     "ContextEntry",

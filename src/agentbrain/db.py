@@ -1,4 +1,4 @@
-"""The :class:`AgentDB` memory layer and its self-improving loop.
+"""The :class:`AgentBrain` memory layer and its self-improving loop.
 
 A thin, typed wrapper over a single SQLite file. Design goals:
 
@@ -22,7 +22,7 @@ The loop is the point::
         →  confidence ≥ graduate_at over a min sample
         →  re-emitted as a learning of type 'preference' — a *proven* rule.
 
-That is what separates agent-db from a store that only remembers what you told
+That is what separates agentbrain from a store that only remembers what you told
 it: it discovers what actually works and promotes it.
 """
 
@@ -83,12 +83,12 @@ def _dump(content: Any) -> str:
     return json.dumps(content, ensure_ascii=False, default=str)
 
 
-class AgentDB:
+class AgentBrain:
     """A SQLite-backed memory store with a built-in learn → prove → graduate loop.
 
     Open one per project::
 
-        db = AgentDB("agent.db")
+        db = AgentBrain("agent.db")
         with db.session(task="content") as s:
             s.learn("pattern", "question hooks lift saves", domain="ig")
             ...
@@ -148,7 +148,7 @@ class AgentDB:
                 self._ambient_id = None
             self._conn.close()
 
-    def __enter__(self) -> "AgentDB":
+    def __enter__(self) -> "AgentBrain":
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -753,7 +753,7 @@ class AgentDB:
     def read_start(self, *, learnings_limit: int = 20) -> StartBrief:
         """Build the "what to know before working" digest.
 
-        Proven ``preferences`` come first — the rules agent-db earned through the
+        Proven ``preferences`` come first — the rules agentbrain earned through the
         loop — then recent learnings, hypotheses still under test, open units
         without a verdict, the latest checkpoint, and recent errors.
         """
@@ -834,7 +834,7 @@ class AgentDB:
 class Session:
     """A handle on one open session. Use it as a context manager.
 
-    Every method delegates to :class:`AgentDB` with this session's id attached,
+    Every method delegates to :class:`AgentBrain` with this session's id attached,
     so all writes inherit a ``session_id`` and the session's outcome is recorded
     on exit. An exception inside the block is captured as an error and marks the
     session unsuccessful before propagating.
@@ -842,7 +842,7 @@ class Session:
 
     __slots__ = ("db", "id", "_outcome", "_success", "_tokens", "_closed")
 
-    def __init__(self, db: AgentDB, session_id: str) -> None:
+    def __init__(self, db: AgentBrain, session_id: str) -> None:
         self.db = db
         self.id = session_id
         self._outcome: str | None = None

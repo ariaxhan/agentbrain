@@ -1,8 +1,8 @@
-# agent-db
+# agentbrain
 
 **A SQLite memory layer for AI agents that learns what works.** Zero dependencies. One file.
 
-Most agent-memory tools store what you *tell* them and hand it back later. agent-db does that too — but it also closes the loop: a pattern you record enough times graduates into a **hypothesis**, every outcome you log becomes an **experiment** for or against it, and once the evidence clears the bar it graduates again into a proven **preference**. Your agent stops guessing and starts running on rules it earned.
+Most agent-memory tools store what you *tell* them and hand it back later. agentbrain does that too — but it also closes the loop: a pattern you record enough times graduates into a **hypothesis**, every outcome you log becomes an **experiment** for or against it, and once the evidence clears the bar it graduates again into a proven **preference**. Your agent stops guessing and starts running on rules it earned.
 
 ```
 learn(pattern)  →  recurs  →  hypothesis (under test)
@@ -15,17 +15,17 @@ That loop is the whole point. It runs on the Python standard library — no vect
 ## Install
 
 ```bash
-pip install agent-db
+pip install agentbrain
 ```
 
-Python 3.10+. No dependencies beyond the standard library. (Import name is `agentdb`.)
+Python 3.10+. No dependencies beyond the standard library. (Import name is `agentbrain`.)
 
 ## Quick start
 
 ```python
-from agentdb import AgentDB
+from agentbrain import AgentBrain
 
-db = AgentDB("agent.db")
+db = AgentBrain("agent.db")
 
 with db.session(task="content") as s:
     # A hunch. Record it as you notice it — three times and it's worth testing.
@@ -40,7 +40,7 @@ with db.session(task="content") as s:
 
 # Next session: the proven rules come first.
 brief = db.read_start()
-for rule in brief.preferences:        # things agent-db has *proven*
+for rule in brief.preferences:        # things agentbrain has *proven*
     print("PROVEN:", rule.insight)
 for h in brief.open_hypotheses:       # things it's still testing
     print("testing:", h.statement, f"({h.confidence:.0%})")
@@ -50,7 +50,7 @@ You don't have to open a session — the flat API (`db.learn(...)`, `db.verdict(
 
 ## Why it's different
 
-|  | agent-db | typical vector-memory store |
+|  | agentbrain | typical vector-memory store |
 | --- | --- | --- |
 | Remembers what you tell it | ✅ | ✅ |
 | **Proves which memories actually work** | ✅ the learn→experiment→graduate loop | ❌ |
@@ -58,7 +58,7 @@ You don't have to open a session — the flat API (`db.learn(...)`, `db.verdict(
 | Infrastructure | a single SQLite file | vector DB / server / API key |
 | Dependencies | none (stdlib `sqlite3`) | several |
 
-Recall stays deliberately simple — substring + a hit counter — because the moat is the loop, not embedding search. (Semantic recall may arrive later as an opt-in `agent-db[embeddings]` extra; the core will always be zero-dependency.)
+Recall stays deliberately simple — substring + a hit counter — because the moat is the loop, not embedding search. (Semantic recall may arrive later as an opt-in `agentbrain[embeddings]` extra; the core will always be zero-dependency.)
 
 ## Built for real, stateful products
 
@@ -88,7 +88,7 @@ s.verdict("pass", unit=app, evidence="recruiter replied")
 
 ## How the tables fill themselves
 
-agent-db has seven tables, and you never write to them directly — **correct use of the API fills every one as a side effect.** Open a session and each write inherits its id, emits an event, and turns the loop:
+agentbrain has seven tables, and you never write to them directly — **correct use of the API fills every one as a side effect.** Open a session and each write inherits its id, emits an event, and turns the loop:
 
 | Table | Filled by | When |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ agent-db has seven tables, and you never write to them directly — **correct us
 The thresholds are tunable and were calibrated on 5,066 real learnings, not guessed: `promote_at=3` (where the recurring-pattern tail actually begins), `graduate_at=0.8` over a minimum of 3 experiments so a single lucky result can't graduate.
 
 ```python
-db = AgentDB("agent.db", promote_at=3, graduate_at=0.8, min_experiments=3)
+db = AgentBrain("agent.db", promote_at=3, graduate_at=0.8, min_experiments=3)
 ```
 
 ## API
@@ -125,13 +125,13 @@ db = AgentDB("agent.db", promote_at=3, graduate_at=0.8, min_experiments=3)
 | `capture_error(tool, error, ...)` / `errors(*, limit)` | Record / fetch failures |
 | `prune(*, keep)` / `stats()` | Trim old checkpoints / row counts per table |
 
-Use `AgentDB(":memory:")` for an ephemeral in-process store (handy in tests).
+Use `AgentBrain(":memory:")` for an ephemeral in-process store (handy in tests).
 
 ## Concurrency & safety
 
 Built for multiple agents sharing one file. SQLite runs in WAL mode with a busy timeout so several processes read and write concurrently; within a process a single connection is lock-guarded, and the verdict→graduation path is one critical section so racing verdicts can never double-graduate a hypothesis. Every value is bound as a query parameter — caller strings never reach the SQL text.
 
-It can open and migrate an older agent-db / base-schema database (learnings, context, errors) forward in place. A database created by a different tool whose `events`/`hypotheses`/`experiments` tables have an incompatible shape is detected on open and rejected with a clear `IncompatibleDatabaseError`, rather than corrupting it.
+It can open and migrate an older agentbrain / base-schema database (learnings, context, errors) forward in place. A database created by a different tool whose `events`/`hypotheses`/`experiments` tables have an incompatible shape is detected on open and rejected with a clear `IncompatibleDatabaseError`, rather than corrupting it.
 
 ## Development
 
