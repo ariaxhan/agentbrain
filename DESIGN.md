@@ -138,3 +138,43 @@ resistance.
 2. Should `unit(kind="spec")` *require* `acceptance=[...]` (enforce the spec/contract
    split at the type level), while `kind="contract"` leaves it optional?
 3. `trace()` auto-open on `unit()` execution: on by default, or opt-in?
+
+## v1 scope (shipped)
+
+v1 ships the **self-improving loop** — the thing that makes agent-db more than a
+memory store — and trims the layers that don't earn their place yet. Every table
+that ships is filled by the normal flow; nothing is aspirational.
+
+**Shipped (7 tables, all deterministically populated):** `sessions`, `events`,
+`learnings` (with graduated `preference` rows), `context` (units / checkpoints /
+handoffs / verdicts), `hypotheses`, `experiments`, `errors`. The loop —
+`learn(pattern) → hypothesis → experiment → preference` — is the moat and is
+fully implemented and tested end-to-end.
+
+**Deferred to a later version (genuinely cuttable, not the differentiator):** the
+`nodes`/`edges` context graph, `execution_traces`, and `compaction_events`. These
+are good ideas but they are not what sets agent-db apart from other memory
+stores; the loop is. They can land later without changing the core.
+
+**Answers to the three open questions, as built:**
+1. Thresholds mined from the real 5,066-learning distribution: `promote_at=3`
+   (the recurring tail begins there — 57% of patterns sit at 1–2 hits, then a
+   sharp drop), `graduate_at=0.8`. Both are constructor-tunable, with a
+   `min_experiments` floor (default 3) so one lucky result can't graduate.
+2. Yes — `unit(kind="spec")` requires `acceptance=[...]`; `kind="contract"`
+   leaves it optional.
+3. The explicit-trace block (`with s.trace(...)`) is deferred along with
+   `execution_traces`; exception capture inside a `session()` covers the
+   failure-recording case in v1.
+
+**Compatibility, as built:** opens and migrates an older agent-db / base-schema
+database (learnings, context, errors) forward in place. A database whose
+`events`/`hypotheses`/`experiments` tables already exist with a *different* shape
+(e.g. the bash-era KERNEL 12-table schema) is detected on open and rejected with
+`IncompatibleDatabaseError` rather than silently failing on the first write —
+those tables' shapes genuinely conflict, so enriching them in place was dropped
+in favour of an honest refusal.
+
+**Retrieval, as built:** `recall()` stays substring + `hit_count`, zero-dep. No
+embedding search in core; an opt-in `agent-db[embeddings]` extra is reserved for
+later. The moat is the loop, not out-embedding a vector store.

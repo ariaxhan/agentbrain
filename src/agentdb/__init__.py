@@ -1,34 +1,57 @@
-"""agent-db — a SQLite-backed memory layer for AI agents.
+"""agent-db — a SQLite-backed memory layer with a self-improving loop.
 
-Read at the start of a session, write at the end. Durable *learnings* that
-survive across sessions, ephemeral *context* (contracts, checkpoints,
-handoffs, verdicts) for the current unit of work, and captured *errors*.
+Not just a place to store what you tell it. agent-db *discovers what works*:
+a pattern you record enough times graduates into a hypothesis, every verdict on
+it is an experiment, and once the evidence clears the bar it graduates again
+into a proven ``preference``. That loop — learn → prove → graduate — is what
+sets it apart from a plain memory store, and it runs on stdlib ``sqlite3`` with
+zero dependencies and no server.
+
+Using the API correctly fills every table as a side effect: open a session and
+each write inherits its id, emits an event, and turns the loop.
 
     from agentdb import AgentDB
 
     db = AgentDB("agent.db")
-    db.learn("gotcha", "WAL mode needed for concurrent agents", domain="db")
-    cid = db.contract({"goal": "ship auth"})
-    db.checkpoint({"did": "wired login"}, contract=cid)
-    db.verdict("pass", evidence="12 tests green", contract=cid)
-    brief = db.read_start()
+    with db.session(task="content") as s:
+        s.learn("pattern", "question hooks lift saves", domain="ig")  # ×3 → hypothesis
+        h = db.hypotheses(status="testing")[0]
+        u = s.unit("post a question-hook carousel", kind="contract", hypothesis=h.id)
+        s.verdict("pass", unit=u, evidence="1.2k saves")             # experiment → ...
+    brief = db.read_start()   # ...and proven preferences surface first
 """
 
-from .db import AgentDB
+from .db import (
+    DEFAULT_GRADUATE_AT,
+    DEFAULT_MIN_EXPERIMENTS,
+    DEFAULT_PROMOTE_AT,
+    AgentDB,
+    Session,
+)
 from .models import (
     ContextEntry,
     ErrorRecord,
+    Experiment,
+    Hypothesis,
     Learning,
     StartBrief,
 )
+from .schema import IncompatibleDatabaseError
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "AgentDB",
+    "Session",
     "Learning",
     "ContextEntry",
+    "Hypothesis",
+    "Experiment",
     "ErrorRecord",
     "StartBrief",
+    "IncompatibleDatabaseError",
+    "DEFAULT_PROMOTE_AT",
+    "DEFAULT_GRADUATE_AT",
+    "DEFAULT_MIN_EXPERIMENTS",
     "__version__",
 ]

@@ -1,14 +1,16 @@
 # agent-db
 
-A SQLite-backed memory layer for AI agents. **Read at the start of a session, write at the end.**
+**A SQLite memory layer for AI agents that learns what works.** Zero dependencies. One file.
 
-Agents forget. Between sessions, between sub-agents, between a crash and a retry, the context that mattered is gone — so the agent repeats the mistake it already made an hour ago. `agent-db` is the small, boring layer that fixes that: one SQLite file, three ideas, zero dependencies.
+Most agent-memory tools store what you *tell* them and hand it back later. agent-db does that too — but it also closes the loop: a pattern you record enough times graduates into a **hypothesis**, every outcome you log becomes an **experiment** for or against it, and once the evidence clears the bar it graduates again into a proven **preference**. Your agent stops guessing and starts running on rules it earned.
 
-- **Learnings** — durable lessons that survive forever (`failure`, `pattern`, `gotcha`, `preference`). Read them at the start of every session so an agent stops re-learning the same thing.
-- **Context** — ephemeral work state for the current unit of work: a `contract`, the `checkpoint`s along the way, a `handoff` for the next session, and a `verdict` when it's done.
-- **Errors** — captured failures, for after-the-fact diagnosis.
+```
+learn(pattern)  →  recurs  →  hypothesis (under test)
+        →  each verdict is an experiment (supports / refutes)
+        →  evidence clears the bar  →  preference  (a proven rule)
+```
 
-It's a **library, not a CLI** — you import it and call methods that return typed objects.
+That loop is the whole point. It runs on the Python standard library — no vector database, no server, no API keys.
 
 ## Install
 
@@ -16,7 +18,7 @@ It's a **library, not a CLI** — you import it and call methods that return typ
 pip install agent-db
 ```
 
-Requires Python 3.10+. No dependencies beyond the standard library.
+Python 3.10+. No dependencies beyond the standard library. (Import name is `agentdb`.)
 
 ## Quick start
 
@@ -25,60 +27,111 @@ from agentdb import AgentDB
 
 db = AgentDB("agent.db")
 
-# Durable memory — survives across sessions
-db.learn("gotcha", "WAL mode is required for concurrent agents", domain="db")
-db.learn("failure", "auth token expired silently", evidence="see log line 412", domain="auth")
+with db.session(task="content") as s:
+    # A hunch. Record it as you notice it — three times and it's worth testing.
+    s.learn("pattern", "question hooks lift saves", domain="instagram")
+    s.learn("pattern", "question hooks lift saves", domain="instagram")
+    s.learn("pattern", "question hooks lift saves", domain="instagram")
 
-# Find a past lesson (bumps its hit count so useful lessons surface)
-for lesson in db.recall("concurrent"):
-    print(lesson.insight)
+    # It just graduated into a hypothesis. Now test it against reality.
+    h = db.hypotheses(status="testing")[0]
+    post = s.unit("carousel with a question hook", kind="contract", hypothesis=h.id)
+    s.verdict("pass", unit=post, evidence="1,240 saves")
 
-# A unit of work: contract -> checkpoint -> verdict
-cid = db.contract({"goal": "ship login", "files": ["auth.py"]})
-db.checkpoint({"did": "wired the login route"}, contract=cid)
-db.verdict("pass", evidence="12 tests green", contract=cid)
-
-# Start of a new session — what do I need to know?
+# Next session: the proven rules come first.
 brief = db.read_start()
-print(len(brief.learnings), "lessons")
-print(len(brief.open_contracts), "unfinished units of work")
-print(brief.last_checkpoint)
+for rule in brief.preferences:        # things agent-db has *proven*
+    print("PROVEN:", rule.insight)
+for h in brief.open_hypotheses:       # things it's still testing
+    print("testing:", h.statement, f"({h.confidence:.0%})")
 ```
 
-## Why this shape
+You don't have to open a session — the flat API (`db.learn(...)`, `db.verdict(...)`) works too and attaches to an ambient session automatically, so the telemetry still fills.
 
-The philosophy is one line: **read at start, write at end.** Every agent run begins with `read_start()` — recent learnings, unfinished contracts, the last checkpoint — and ends with a `checkpoint()` or `handoff()`. Nothing is lost when the process dies, and a fresh agent can pick up exactly where the last one stopped.
+## Why it's different
 
-It's built for **multiple agents sharing one file**. SQLite runs in WAL mode with a busy timeout, so several processes can read and write concurrently without stepping on each other; within a process, a single connection is guarded by a lock so one instance is safe to call from multiple threads. Every value is bound as a query parameter — user strings never reach the SQL text.
+|  | agent-db | typical vector-memory store |
+| --- | --- | --- |
+| Remembers what you tell it | ✅ | ✅ |
+| **Proves which memories actually work** | ✅ the learn→experiment→graduate loop | ❌ |
+| Working state + telemetry, not just recall | ✅ units, checkpoints, sessions, events | ❌ |
+| Infrastructure | a single SQLite file | vector DB / server / API key |
+| Dependencies | none (stdlib `sqlite3`) | several |
+
+Recall stays deliberately simple — substring + a hit counter — because the moat is the loop, not embedding search. (Semantic recall may arrive later as an opt-in `agent-db[embeddings]` extra; the core will always be zero-dependency.)
+
+## Built for real, stateful products
+
+The loop is general. Three shapes it was designed against:
+
+**Self-learning content engine.** Each post is a unit; engagement is the verdict. Hooks that keep winning graduate into the brand's proven playbook.
+```python
+s.learn("pattern", "carousels outperform single images", domain="ig")  # ...×3 → hypothesis
+for saves, ok in [(1200,"pass"), (90,"fail"), (1500,"pass"), (1100,"pass")]:
+    post = s.unit(f"carousel ({saves} saves)", kind="contract", hypothesis=h.id)
+    s.verdict(ok, unit=post, evidence=f"{saves} saves")
+# 3/4 supported → graduates into the playbook
+```
+
+**Lead capture.** Each lead is a unit with its own checkpoint trail; a tactic about what converts graduates once enough leads confirm it.
+```python
+lead = s.unit({"name": "Acme", "source": "webinar"}, kind="contract")
+s.checkpoint({"stage": "demo booked"}, unit=lead)
+s.verdict("pass", unit=lead, evidence="closed")
+```
+
+**Self-improving job applications.** Each application is a unit; "lead with a shipped metric" stays a guess until enough replies prove it, then becomes a rule.
+```python
+app = s.unit({"company": "Acme"}, kind="contract", hypothesis=h.id)
+s.verdict("pass", unit=app, evidence="recruiter replied")
+```
+
+## How the tables fill themselves
+
+agent-db has seven tables, and you never write to them directly — **correct use of the API fills every one as a side effect.** Open a session and each write inherits its id, emits an event, and turns the loop:
+
+| Table | Filled by | When |
+| --- | --- | --- |
+| `sessions` | `db.session()` open/close | every run |
+| `events` | every write method | always (telemetry is automatic) |
+| `learnings` | `learn()` — `preference` rows are *graduated* | always |
+| `context` | `unit()`, `checkpoint()`, `handoff()`, `verdict()` | always |
+| `hypotheses` | a `pattern` crossing `promote_at` (default 3 hits) | automatic |
+| `experiments` | a `verdict()` on a unit/hypothesis under test | automatic |
+| `errors` | `capture_error()`, and any exception inside a session | automatic |
+
+The thresholds are tunable and were calibrated on 5,066 real learnings, not guessed: `promote_at=3` (where the recurring-pattern tail actually begins), `graduate_at=0.8` over a minimum of 3 experiments so a single lucky result can't graduate.
+
+```python
+db = AgentDB("agent.db", promote_at=3, graduate_at=0.8, min_experiments=3)
+```
 
 ## API
 
 | Method | What it does |
 | --- | --- |
-| `learn(type, insight, *, evidence, domain, visibility, sensitivity)` | Record a durable lesson |
+| `session(*, task, tier, agent, meta)` | Open a session (context manager); records the outcome on close |
+| `learn(type, insight, *, evidence, domain, ...)` | Record/reinforce a lesson; recurring `pattern`s graduate to hypotheses |
+| `recall(query, *, limit)` | Substring-search lessons; bumps hit count (can trigger graduation) |
 | `learnings(*, type, domain, limit)` | Fetch lessons, newest first |
-| `recall(query, *, limit)` | Substring-search lessons; bumps hit count |
 | `forget(id)` | Delete a lesson |
-| `contract(content, *, agent)` | Open a unit of work, returns its id |
-| `checkpoint(content, *, contract, agent)` | Record progress mid-work |
-| `handoff(content, *, contract, agent)` | Record a brief for the next session |
-| `verdict(result, *, evidence, contract, agent)` | Record `"pass"`/`"fail"` |
-| `context(*, type, contract, limit)` | Fetch work-state entries |
-| `read_start(*, learnings_limit)` | Build the "what to know" digest |
-| `write_end(content, *, contract)` | Checkpoint before stopping |
-| `capture_error(tool, error, *, file, context, domain)` | Record a failure |
-| `errors(*, limit)` | Fetch captured failures |
-| `prune(*, keep)` | Trim old checkpoints |
-| `stats()` | Row counts per table |
-
-`AgentDB` is also a context manager:
-
-```python
-with AgentDB("agent.db") as db:
-    db.learn("pattern", "always read_start() first")
-```
+| `unit(statement, *, kind, acceptance, hypothesis)` | Open a unit of work; `kind="spec"` requires `acceptance=[...]` |
+| `checkpoint(content, *, unit, agent)` | Record progress mid-work |
+| `handoff(content, *, unit, agent)` | Record a brief for the next session |
+| `verdict(result, *, unit, hypothesis, evidence)` | `"pass"`/`"fail"`; becomes an experiment when a hypothesis is in play |
+| `hypotheses(*, status, limit)` / `experiments(*, hypothesis)` | Inspect the loop |
+| `context(*, type, unit, limit)` | Fetch work-state entries |
+| `read_start(*, learnings_limit)` | The "what to know" digest — proven preferences first |
+| `capture_error(tool, error, ...)` / `errors(*, limit)` | Record / fetch failures |
+| `prune(*, keep)` / `stats()` | Trim old checkpoints / row counts per table |
 
 Use `AgentDB(":memory:")` for an ephemeral in-process store (handy in tests).
+
+## Concurrency & safety
+
+Built for multiple agents sharing one file. SQLite runs in WAL mode with a busy timeout so several processes read and write concurrently; within a process a single connection is lock-guarded, and the verdict→graduation path is one critical section so racing verdicts can never double-graduate a hypothesis. Every value is bound as a query parameter — caller strings never reach the SQL text.
+
+It can open and migrate an older agent-db / base-schema database (learnings, context, errors) forward in place. A database created by a different tool whose `events`/`hypotheses`/`experiments` tables have an incompatible shape is detected on open and rejected with a clear `IncompatibleDatabaseError`, rather than corrupting it.
 
 ## Development
 

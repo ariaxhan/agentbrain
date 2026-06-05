@@ -25,3 +25,6 @@ htmlcov/
 
 # Obsidian
 .obsidian/
+
+# Kernel session tracking (local only)
+_meta/

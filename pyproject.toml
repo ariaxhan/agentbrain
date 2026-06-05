@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-db"
-version = "0.1.0"
-description = "A SQLite-backed memory layer for AI agents. Read at start, write at end."
+version = "1.0.0"
+description = "A zero-dependency SQLite memory layer for AI agents that learns what works: patterns graduate to proven preferences via a built-in experiment loop."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Aria Han" }]
-keywords = ["agents", "memory", "sqlite", "llm", "ai", "checkpoint", "orchestration"]
+keywords = ["agents", "memory", "sqlite", "llm", "ai", "checkpoint", "orchestration", "self-improving", "reinforcement"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
@@ -32,6 +32,9 @@ Issues = "https://github.com/ariaxhan/agent-db/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
+# Reserved for an opt-in semantic-recall backend. The core stays zero-dependency;
+# the moat is the learn → prove → graduate loop, not embedding search.
+embeddings = []
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentdb"]
