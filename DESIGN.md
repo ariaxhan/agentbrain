@@ -1,4 +1,4 @@
-# agentbrain — Design: every table earns its place
+# metabrain — Design: every table earns its place
 
 ## The problem the bash era couldn't solve
 
@@ -12,7 +12,7 @@ populating them was a **bash hook**: fire-and-forget, best-effort, unable to *re
 that an agent record a node, link an edge, or graduate a pattern. The schema was a
 good contract with no enforcer.
 
-A Python package is the enforcer. When AgentBrain is a library an agent *calls* rather
+A Python package is the enforcer. When MetaBrain is a library an agent *calls* rather
 than a CLI a hook *hopes will run*, the data structure itself becomes the forcing
 function. **This document specifies an API where using it correctly deterministically
 populates all 12 tables — bookkeeping as a side effect of ergonomic calls, never a
@@ -42,9 +42,9 @@ constraint is what makes the rest deterministic: every downstream write inherits
 known at close.
 
 ```python
-from agentbrain import AgentBrain
+from metabrain import MetaBrain
 
-db = AgentBrain("agent.db")
+db = MetaBrain("agent.db")
 
 with db.session(task="feature", tier=2) as s:        # 1 context_sessions row + session event
     s.load("src/auth/login.ts")                       # node(code) upsert + event
@@ -99,7 +99,7 @@ learn(pattern)  →  recall bumps hit_count  →  hit_count ≥ promote_at
 
 `preference` had **zero rows** across every database because nothing ever graduated —
 there was no mechanism, only a hook that hoped. The package makes graduation a
-deterministic consequence of recall + verdict, both of which already flow. AgentBrain
+deterministic consequence of recall + verdict, both of which already flow. MetaBrain
 stops being a logbook and becomes a system that *earns* its preferences from evidence.
 
 ## The context graph pays off (why `nodes`/`edges` matter)
@@ -141,7 +141,7 @@ resistance.
 
 ## v1 scope (shipped)
 
-v1 ships the **self-improving loop** — the thing that makes agentbrain more than a
+v1 ships the **self-improving loop** — the thing that makes metabrain more than a
 memory store — and trims the layers that don't earn their place yet. Every table
 that ships is filled by the normal flow; nothing is aspirational.
 
@@ -153,7 +153,7 @@ fully implemented and tested end-to-end.
 
 **Deferred to a later version (genuinely cuttable, not the differentiator):** the
 `nodes`/`edges` context graph, `execution_traces`, and `compaction_events`. These
-are good ideas but they are not what sets agentbrain apart from other memory
+are good ideas but they are not what sets metabrain apart from other memory
 stores; the loop is. They can land later without changing the core.
 
 **Answers to the three open questions, as built:**
@@ -167,7 +167,7 @@ stores; the loop is. They can land later without changing the core.
    `execution_traces`; exception capture inside a `session()` covers the
    failure-recording case in v1.
 
-**Compatibility, as built:** opens and migrates an older agentbrain / base-schema
+**Compatibility, as built:** opens and migrates an older metabrain / base-schema
 database (learnings, context, errors) forward in place. A database whose
 `events`/`hypotheses`/`experiments` tables already exist with a *different* shape
 (e.g. the bash-era KERNEL 12-table schema) is detected on open and rejected with
@@ -176,5 +176,5 @@ those tables' shapes genuinely conflict, so enriching them in place was dropped
 in favour of an honest refusal.
 
 **Retrieval, as built:** `recall()` stays substring + `hit_count`, zero-dep. No
-embedding search in core; an opt-in `agentbrain[embeddings]` extra is reserved for
+embedding search in core; an opt-in `metabrain[embeddings]` extra is reserved for
 later. The moat is the loop, not out-embedding a vector store.

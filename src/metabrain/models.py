@@ -1,4 +1,4 @@
-"""Typed records returned by :class:`agentbrain.AgentBrain`.
+"""Typed records returned by :class:`metabrain.MetaBrain`.
 
 Every read method hands back one of these dataclasses (or a list of them)
 rather than a raw row, so callers get attribute access and a stable shape.
@@ -191,9 +191,9 @@ class ErrorRecord:
 
 @dataclass(slots=True)
 class StartBrief:
-    """The digest returned by :meth:`AgentBrain.read_start` — what to know before working.
+    """The digest returned by :meth:`MetaBrain.read_start` — what to know before working.
 
-    ``preferences`` come first by design: they are the rules agentbrain has
+    ``preferences`` come first by design: they are the rules metabrain has
     *proven* through the learn → hypothesis → experiment loop, as opposed to
     ``learnings`` (recent, unproven) and ``open_hypotheses`` (still under test).
     """

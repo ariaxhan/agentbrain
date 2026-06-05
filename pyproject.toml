@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentbrain"
+name = "metabrain"
 version = "1.0.0"
 description = "A zero-dependency SQLite memory layer for AI agents that learns what works: patterns graduate to proven preferences via a built-in experiment loop."
 readme = "README.md"
@@ -26,9 +26,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/ariaxhan/agentbrain"
-Repository = "https://github.com/ariaxhan/agentbrain"
-Issues = "https://github.com/ariaxhan/agentbrain/issues"
+Homepage = "https://github.com/ariaxhan/metabrain"
+Repository = "https://github.com/ariaxhan/metabrain"
+Issues = "https://github.com/ariaxhan/metabrain/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
@@ -37,7 +37,7 @@ dev = ["pytest>=7.0"]
 embeddings = []
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agentbrain"]
+packages = ["src/metabrain"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
